@@ -1,3 +1,92 @@
+Payment Instruction Parser — Assessment Solution
+
+This repository is my completed solution to the NodejsBackendEngineer2025 assessment using the provided project scaffold. Below you'll find a concise explanation of what I implemented, why, and how to run and test it locally (including a Postman collection you can import).
+
+What I implemented
+
+- A robust instruction parser and executor service that follows the assessment specification exactly (no regex — only string methods).
+- A HTTP endpoint POST /payment-instructions that uses the parser service and returns the required response shape and HTTP status codes.
+- Unit tests (Mocha + Chai) for happy paths and many edge cases.
+- Integration tests (supertest) that start the server in-process and POST the assessment sample requests.
+- A Postman collection (postman_collection.json) with example requests you can import to run against a local or deployed server.
+
+Files I added or modified (high level)
+- services/payment-processor/parse-instruction.js — the main parser + executor service. Returns { httpStatus, body } where body is the assessment response object.
+- endpoints/payment-instructions/process.js — endpoint handler (uses createHandler from the scaffold). Returns HTTP 200 for success/pending and HTTP 400 for validation/parsing errors.
+- test/parse-instruction.spec.js — unit tests for main happy paths.
+- test/parse-instruction.edge.spec.js — additional unit tests for edge cases (decimal amounts, same account, date == today, account ids with symbols).
+- test/integration/payment-instructions.integration.spec.js — integration tests that register the handler in an in-process server and POST the sample requests using supertest.
+- postman_collection.json — Postman v2.1 collection you can import.
+- package.json — added supertest as a devDependency for integration tests.
+
+Important design decisions & notes
+
+- No regular expressions: Parsing is implemented using only trim(), split(' '), indexOf, substring, toUpperCase() and numeric checks — matching the assessment constraint.
+- Date handling: The optional ON YYYY-MM-DD clause is parsed manually (validated format) and compared to current UTC date using the YYYY-MM-DD string comparison (safe when using that canonical format). If ON date > today → transaction is pending (AP02), otherwise it executes immediately (AP00).
+- Account order preserved: Response accounts array preserves the order of accounts as they appeared in the request (per assessment requirement).
+- No persistence: The assessment requested no database; the endpoint operates purely on the provided request body. The template includes core/mongoose helpers, but I did not use a DB for this assessment.
+
+How to run locally (Windows PowerShell)
+
+1. Install dependencies (if not already):
+
+PowerShell:
+npm install
+
+2. Start the server (default port 8811):
+
+PowerShell:
+# Start without loading AWS Secrets and without requiring a MongoDB URI in dev
+$env:USE_SECRETS_MANAGER = ''
+node app.js
+
+Alternatively you can run bootstrap.js if you want the AWS Secrets loader (only if you configure USE_SECRETS_MANAGER and have AWS credentials configured):
+
+PowerShell:
+node bootstrap.js
+
+Note on database: app.js will call createConnection if MONGODB_URI is set — this is optional. For the assessment the implementation and tests assume no database is required.
+
+How to run tests
+
+Run the full test suite (unit + integration):
+
+PowerShell:
+npm test
+
+I added unit and integration tests. The test suite exercises the parser directly and also sends HTTP requests to the in-process server (no network port required for integration tests).
+
+Postman collection
+
+- The file postman_collection.json is included at the repository root. Import it into Postman: Import → File → choose postman_collection.json.
+- The requests target http://localhost:8811/payment-instructions. If you run the server on a different port, edit the request URL or set up an environment variable in Postman.
+
+API contract summary
+
+Endpoint: POST /payment-instructions
+
+Request body shape: { accounts: [{ id, balance, currency }...], instruction: "..." }
+
+Response: JSON object with the fields required by the assessment: type, amount, currency, debit_account, credit_account, execute_by, status, status_reason, status_code, accounts.
+
+HTTP codes used by the endpoint:
+- 200: successful execution or pending scheduling
+- 400: validation or parsing errors
+
+Assumptions & notes
+
+- The assessment specified "No database required" — I followed that. The server can connect to MongoDB if MONGODB_URI is provided, but the payment logic works entirely in-memory based on the request payload.
+- The parser explicitly avoids use of regular expressions as required.
+- If multiple validation errors exist, the service returns any one valid error (the tests expect a covered error rather than a specific ordering of multiple errors).
+
+Next steps (optional)
+
+- Add more descriptive status_reason text in some validation responses for easier debugging.
+- Add CI (GitHub Actions) to run tests on push.
+- Add more integration tests for all assessment invalid cases (if desired).
+
+
+
 # Assessment Codebase Guide
 
 This guide will help you understand the codebase architecture and set up your services, endpoints, and middleware correctly. This is NOT a solution to the assessment - it's a reference guide to help you implement your own solution following the codebase conventions.
